@@ -350,6 +350,34 @@ class CuDNNPoolingLayer : public PoolingLayer<Dtype> {
 };
 #endif
 
+template <typename Dtype>
+class UpsamplingLayer : public Layer<Dtype> {
+public:
+	explicit UpsamplingLayer(const LayerParameter& param)
+		: Layer<Dtype>(param) {}
+	virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+		vector<Blob<Dtype>*>* top);
+	virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+		vector<Blob<Dtype>*>* top);
+	
+	virtual inline LayerParameter_LayerType type() const 
+	{
+		return LayerParameter_LayerType_UPSAMPLING;
+	}
+	
+	virtual inline int ExactNumBottomBlobs() const { return 1; }
+	virtual inline int ExactNumTopBlobs() const { return 1; }
+	
+protected:
+	virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+		vector<Blob<Dtype>*>* top);
+	virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+		const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
+
+	int num, channels, width, height;
+	int newWidth, newHeight;
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_VISION_LAYERS_HPP_
