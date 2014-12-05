@@ -378,6 +378,38 @@ protected:
 	int newWidth, newHeight;
 };
 
+template <typename Dtype>
+class SelectingLayer : public Layer<Dtype> {
+public:
+	explicit SelectingLayer(const LayerParameter& param)
+		: Layer<Dtype>(param) {}
+	virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+		vector<Blob<Dtype>*>* top);
+	virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+		vector<Blob<Dtype>*>* top);
+	
+	virtual inline LayerParameter_LayerType type() const 
+	{
+		return LayerParameter_LayerType_SELECTING;
+	}
+	
+	virtual inline int ExactNumBottomBlobs() const { return 1; }
+	virtual inline int ExactNumTopBlobs() const { return 1; }
+	
+protected:
+	virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+		vector<Blob<Dtype>*>* top);
+	virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+		const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
+		
+	// parameters
+	int num_output, group_size;
+	// bottom's
+	int count, num, channels, width, height;
+	
+	vector<int> shuffle;
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_VISION_LAYERS_HPP_
