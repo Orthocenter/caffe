@@ -31,7 +31,7 @@ void SelectingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 	
 	shuffle.resize(channels);
 	for(int i = 0; i < channels; i++) shuffle[i] = i;
-	std::random_shuffle(shuffle.begin(), shuffle.end());
+	std::random_shuffle(shuffle.begin(), shuffle.end(), Random_Caffe);
 	
 	(*top)[0]->Reshape(num, num_output, height, width);
 }
