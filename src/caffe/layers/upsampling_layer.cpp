@@ -18,6 +18,9 @@ void UpsamplingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 	
 	newWidth = upsample_param.new_width();
 	newHeight = upsample_param.new_height();
+	
+	areaRatio = (double)upsample_param.new_width() * upsample_param.new_height() /
+		bottom[0]->width() / bottom[0]->height();
 }
 
 template <typename Dtype>
@@ -68,7 +71,7 @@ void UpsamplingLayer<Dtype>::Forward_cpu(
 				}
 			}
 			
-			cv::resize(img, img, cv::Size(newWidth, newHeight));
+			cv::resize(img, img, cv::Size(newWidth, newHeight), 0, 0, cv::INTER_AREA);
 			
 			// copy resized image into top_data
 			int nnr = newHeight, nnc = newWidth;
@@ -82,11 +85,10 @@ void UpsamplingLayer<Dtype>::Forward_cpu(
 			// each row
 			for(int r = 0; r < nnr; r++)
 			{
+				double *img_data = img.ptr<double>(r);
 				// each column
 				for(int c = 0; c < nnc; c++)
-				{
-					double *img_data = img.ptr<double>(r);
-					
+				{	
 					*top_data++ = static_cast<Dtype>(*img_data++);
 				}
 			}
@@ -127,7 +129,7 @@ void UpsamplingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 					}
 				}
 				
-				cv::resize(mat_diff, mat_diff, cv::Size(width, height));
+				cv::resize(mat_diff, mat_diff, cv::Size(width, height), 0, 0, cv::INTER_AREA);
 				
 				// copy resized mat_diff into bottom_diff
 				int nnr = height, nnc = width;
@@ -143,7 +145,7 @@ void UpsamplingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 					double *mat_diff_data = mat_diff.ptr<double>(r);
 					for(int c = 0; c < nnc; c++)
 					{
-						*bottom_diff++ = *mat_diff_data++;
+						*bottom_diff++ = (*mat_diff_data++) * areaRatio;
 					}
 				}
 			}

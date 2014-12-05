@@ -376,6 +376,8 @@ protected:
 
 	int num, channels, width, height;
 	int newWidth, newHeight;
+	
+	double areaRatio;
 };
 
 template <typename Dtype>
