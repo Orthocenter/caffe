@@ -21,7 +21,6 @@ template <typename Dtype>
 void SelectingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 	vector<Blob<Dtype>*>* top)
 {
-	count = bottom[0]->count();
 	num = bottom[0]->num();
 	channels = bottom[0]->channels();
 	width = bottom[0]->width();
@@ -42,6 +41,7 @@ void SelectingLayer<Dtype>::Forward_cpu(
 {
 	Dtype* top_data = (*top)[0]->mutable_cpu_data();
 	const Dtype* bottom_data = bottom[0]->cpu_data();
+	int top_data_count = (*top)[0]->count();
 	
 	int spatial_dims = width * height;
 	for(int n = 0; n < num; n++)
@@ -52,7 +52,7 @@ void SelectingLayer<Dtype>::Forward_cpu(
 			Dtype *output_data = top_data + (*top)[0]->offset(n, i);
 			caffe_copy(spatial_dims, 
 				bottom_data + bottom[0]->offset(n, shuffle[shuffle_offset++]), output_data);
-		
+			
 			// add other channels in i_th group into output channel
 			for(int j = 1; j < group_size; j++)
 			{
@@ -60,11 +60,6 @@ void SelectingLayer<Dtype>::Forward_cpu(
 					bottom_data + bottom[0]->offset(n, shuffle[shuffle_offset++]), output_data);
 			}
 		}
-	
-		// average
-		double scale_factor = 1. / group_size;
-		caffe_axpy<Dtype>(count, scale_factor - 1, top_data + (*top)[0]->offset(n), 
-			top_data + (*top)[0]->offset(n));
 	}
 }
 

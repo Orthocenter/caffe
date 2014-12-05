@@ -395,14 +395,14 @@ public:
 	
 	virtual inline int ExactNumBottomBlobs() const { return 1; }
 	virtual inline int ExactNumTopBlobs() const { return 1; }
-	
+
+	static int Random_Caffe(int i) { return caffe_rng_rand() % i; }
+
 protected:
 	virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 		vector<Blob<Dtype>*>* top);
 	virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
 		const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
-	
-	virtual void Random_Caffe(int i) { return caffe_rng_rand() % i; }
 	
 	// parameters
 	int num_output, group_size;
