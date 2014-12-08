@@ -56,25 +56,26 @@ TYPED_TEST(SelectingLayerTest, TestSetup)
 	LayerParameter layer_param;
 	
 	SelectingParameter *selecting_param = layer_param.mutable_selecting_param();
-	selecting_param->set_num_output(2);
+	selecting_param->set_num_output(4);
 	selecting_param->set_group_size(2);
+	selecting_param->set_distinct(false);
 	
 	SelectingLayer<Dtype> layer(layer_param);
 	layer.SetUp(this->blob_bottom_vec, &(this->blob_top_vec));
 	EXPECT_EQ(this->blob_bottom->width(), this->blob_top->width());
 	EXPECT_EQ(this->blob_bottom->height(), this->blob_top->height());
-	EXPECT_EQ(this->blob_top->channels(), 2);
+	EXPECT_EQ(this->blob_top->channels(), 4);
 	EXPECT_EQ(this->blob_bottom->num(), this->blob_top->num());
 }
 
-TYPED_TEST(SelectingLayerTest, TestSetupOneGroup)
+TYPED_TEST(SelectingLayerTest, TestSetupDistinct)
 {
 	typedef typename TypeParam::Dtype Dtype;
 	LayerParameter layer_param;
 	
 	SelectingParameter *selecting_param = layer_param.mutable_selecting_param();
 	selecting_param->set_num_output(1);
-	selecting_param->set_group_size(4);
+	selecting_param->set_group_size(3);
 	
 	SelectingLayer<Dtype> layer(layer_param);
 	layer.SetUp(this->blob_bottom_vec, &(this->blob_top_vec));
@@ -88,49 +89,65 @@ TYPED_TEST(SelectingLayerTest, TestForward)
 {
 	typedef typename TypeParam::Dtype Dtype;
 	
+	const int bottom_num = this->blob_bottom->num();
+	const int num_output = 4;
+	const int group_size = 2;
+	const int bottom_channels = this->blob_bottom->channels();
+	
 	LayerParameter layer_param;
 	SelectingParameter *selecting_param = layer_param.mutable_selecting_param();
-	selecting_param->set_num_output(2);
-	selecting_param->set_group_size(2);
+	selecting_param->set_num_output(num_output);
+	selecting_param->set_group_size(group_size);
+	selecting_param->set_distinct(false);
 	
 	Caffe::set_random_seed(1701);
 	SelectingLayer<Dtype> layer1(layer_param);
 	layer1.SetUp(this->blob_bottom_vec, &(this->blob_top_vec));
 
-	int spatial_dims = this->blob_bottom->height() * this->blob_bottom->width();
-	int top_dims = this->blob_top->channels() * spatial_dims;
-	int bottom_dims = this->blob_bottom->channels() * spatial_dims;
+	const int spatial_dims = this->blob_bottom->height() * this->blob_bottom->width();
+	const int top_dims = this->blob_top->channels() * spatial_dims;
+	const int bottom_dims = this->blob_bottom->channels() * spatial_dims;
 
 	// Generate forward blob
 	layer1.Forward(this->blob_bottom_vec, &(this->blob_top_vec));
 	
 	vector<Dtype> sequence;
-	for(int i = 0, offset = 0; i < 2; i++)
+	for(int i = 0, offset = 0; i < bottom_num; i++)
 	{
 		for(int j = 0; j < top_dims; j++) sequence.push_back(this->blob_top->cpu_data()[offset++]);
 	}
 	
 	// Calculate ground truth
 	Caffe::set_random_seed(1701);
-	vector<int> shuffle(4);
-	for(int i = 0; i < 4; i++) shuffle[i] = i;
-	std::random_shuffle(shuffle.begin(), shuffle.end(), SelectingLayerTest<TypeParam>::Random_Caffe);
+	vector<vector<int> > shuffles;
+	vector<int> shuffle(bottom_channels);
+	for(int i = 0; i < bottom_channels; i++) shuffle[i] = i;
+	for(int i = 0; i < bottom_channels; i++)
+	{
+		std::random_shuffle(shuffle.begin(), shuffle.end(),
+			SelectingLayerTest<TypeParam>::Random_Caffe);
+		shuffles.push_back(shuffle);
+	}
 	
 	vector<Dtype> sequence_gt;
-	for(int i = 0; i < 2; i++)
+	for(int i = 0; i < bottom_num; i++)
 	{
-		for(int j = 0; j < spatial_dims; j++)
+		for(int och = 0; och < num_output; och++)
 		{
-			Dtype value = this->blob_bottom->cpu_data()[i * bottom_dims + shuffle[0] * spatial_dims + j] +
-				this->blob_bottom->cpu_data()[i * bottom_dims + shuffle[1] * spatial_dims + j];
-			sequence_gt.push_back(value);
-		}
-		
-		for(int j = 0; j < spatial_dims; j++)
-		{
-			Dtype value = this->blob_bottom->cpu_data()[i * bottom_dims + shuffle[2] * spatial_dims + j] +
-				this->blob_bottom->cpu_data()[i * bottom_dims + shuffle[3] * spatial_dims + j];
-			sequence_gt.push_back(value);
+			vector<int> &shuffle = shuffles[och];
+			
+			for(int j = 0; j < spatial_dims; j++)
+			{
+				Dtype value = 0;
+				
+				for(int g = 0; g < group_size; g++)
+				{
+					value += this->blob_bottom->cpu_data()[i * bottom_dims + 
+						shuffle[g] * spatial_dims + j];
+				}
+				
+				sequence_gt.push_back(value);
+			}
 		}
 	}
 	
@@ -141,14 +158,19 @@ TYPED_TEST(SelectingLayerTest, TestForward)
 	}
 }
 
-TYPED_TEST(SelectingLayerTest, TestForwardOneGroup)
+TYPED_TEST(SelectingLayerTest, TestForwardDistinct)
 {
 	typedef typename TypeParam::Dtype Dtype;
 	
+	const int bottom_num = this->blob_bottom->num();
+	const int num_output = 1;
+	const int group_size = 3;
+	const int bottom_channels = this->blob_bottom->channels();
+	
 	LayerParameter layer_param;
 	SelectingParameter *selecting_param = layer_param.mutable_selecting_param();
-	selecting_param->set_num_output(1);
-	selecting_param->set_group_size(3);
+	selecting_param->set_num_output(num_output);
+	selecting_param->set_group_size(group_size);
 	
 	Caffe::set_random_seed(1701);
 	SelectingLayer<Dtype> layer1(layer_param);
@@ -161,26 +183,29 @@ TYPED_TEST(SelectingLayerTest, TestForwardOneGroup)
 	// Generate forward blob
 	layer1.Forward(this->blob_bottom_vec, &(this->blob_top_vec));
 	vector<Dtype> sequence;
-	for(int i = 0, offset = 0; i < 2; i++)
+	for(int i = 0, offset = 0; i < num_output; i++)
 	{
 		for(int j = 0; j < top_dims; j++) sequence.push_back(this->blob_top->cpu_data()[offset++]);
 	}
 	
 	// Calculate ground truth
 	Caffe::set_random_seed(1701);
-	vector<int> shuffle(4);
-	for(int i = 0; i < 4; i++) shuffle[i] = i;
+	vector<int> shuffle(bottom_channels);
+	for(int i = 0; i < bottom_channels; i++) shuffle[i] = i;
 	
 	std::random_shuffle(shuffle.begin(), shuffle.end(), SelectingLayerTest<TypeParam>::Random_Caffe);
 	
 	vector<Dtype> sequence_gt;
-	for(int i = 0; i < 2; i++)
+	for(int i = 0; i < num_output; i++)
 	{
 		for(int j = 0; j < spatial_dims; j++)
 		{
-			Dtype value = this->blob_bottom->cpu_data()[i * bottom_dims + shuffle[0] * spatial_dims + j] +
-				this->blob_bottom->cpu_data()[i * bottom_dims + shuffle[1] * spatial_dims + j] +
-				this->blob_bottom->cpu_data()[i * bottom_dims + shuffle[2] * spatial_dims + j];
+			Dtype value = 0;
+			
+			for(int g = 0; g < group_size; g++)
+			{
+				value += this->blob_bottom->cpu_data()[i * bottom_dims + shuffle[g] * spatial_dims + j];
+			}
 			sequence_gt.push_back(value);
 		}
 	}
@@ -199,16 +224,17 @@ TYPED_TEST(SelectingLayerTest, TestGradient)
 	
 	LayerParameter layer_param;
 	SelectingParameter* selecting_param = layer_param.mutable_selecting_param();
-	selecting_param->set_num_output(2);
+	selecting_param->set_num_output(4);
 	selecting_param->set_group_size(2);
-	
+	selecting_param->set_distinct(false);
+
 	SelectingLayer<Dtype> layer(layer_param);
 	
 	GradientChecker<Dtype> checker(1e-2, 1e-2);
 	checker.CheckGradientExhaustive(&layer, &(this->blob_bottom_vec), &(this->blob_top_vec));
 }
 
-TYPED_TEST(SelectingLayerTest, TestGradientOneGroup)
+TYPED_TEST(SelectingLayerTest, TestGradientDistinct)
 {
 	typedef typename TypeParam::Dtype Dtype;
 	

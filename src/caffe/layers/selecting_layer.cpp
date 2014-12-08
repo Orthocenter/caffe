@@ -15,6 +15,7 @@ void SelectingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 	
 	num_output = selecting_param.num_output();
 	group_size = selecting_param.group_size();
+	distinct = selecting_param.distinct();
 }
 
 template <typename Dtype>
@@ -26,11 +27,36 @@ void SelectingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 	width = bottom[0]->width();
 	height = bottom[0]->height();
 
-	CHECK(group_size * num_output <= channels) << "Group_size * num_output cannot be GREATER than input channels";
-	
-	shuffle.resize(channels);
-	for(int i = 0; i < channels; i++) shuffle[i] = i;
-	std::random_shuffle(shuffle.begin(), shuffle.end(), Random_Caffe);
+	this->blobs_.resize(1);
+	this->blobs_[0].reset(new Blob<Dtype>(
+		1, num_output, group_size, 1));
+
+	if(distinct)
+	{
+		int total_output = group_size * num_output;
+		
+		CHECK(group_size * num_output <= channels) << "Group_size * num_output cannot be GREATER than input channels";
+		
+		vector<int> shuffle(channels);
+		for(int i = 0 ; i < channels; i++) shuffle[i] = i;
+		std::random_shuffle(shuffle.begin(), shuffle.end(), Random_Caffe);
+		
+		Dtype *data = this->blobs_[0]->mutable_cpu_data();
+		for(int i = 0; i < total_output; i++) data[i] = round(shuffle[i]);
+	}
+	else
+	{
+		vector<int> shuffle(channels);
+		for(int i = 0; i < channels; i++) shuffle[i] = i;
+		
+		for(int i = 0; i < num_output; i++)
+		{
+			std::random_shuffle(shuffle.begin(), shuffle.end(), Random_Caffe);
+			
+			Dtype *data = this->blobs_[0]->mutable_cpu_data() + this->blobs_[0]->offset(0, i);
+			for(int j = 0; j < group_size; j++) data[j] = round(shuffle[j]);
+		}
+	}
 	
 	(*top)[0]->Reshape(num, num_output, height, width);
 }
@@ -41,23 +67,24 @@ void SelectingLayer<Dtype>::Forward_cpu(
 {
 	Dtype* top_data = (*top)[0]->mutable_cpu_data();
 	const Dtype* bottom_data = bottom[0]->cpu_data();
-	int top_data_count = (*top)[0]->count();
 	
 	int spatial_dims = width * height;
 	for(int n = 0; n < num; n++)
 	{
-		for(int i = 0, shuffle_offset = 0; i < num_output; i++)
+		for(int i = 0; i < num_output; i++)
 		{
+			const Dtype *shuffle = this->blobs_[0]->cpu_data() + this->blobs_[0]->offset(0, i);
+			
 			// copy the first channel in i_th group into output channel
 			Dtype *output_data = top_data + (*top)[0]->offset(n, i);
 			caffe_copy(spatial_dims, 
-				bottom_data + bottom[0]->offset(n, shuffle[shuffle_offset++]), output_data);
-			
+				bottom_data + bottom[0]->offset(n, round(shuffle[0])), output_data);
+
 			// add other channels in i_th group into output channel
 			for(int j = 1; j < group_size; j++)
 			{
-				caffe_axpy<Dtype>(spatial_dims, 1., 
-					bottom_data + bottom[0]->offset(n, shuffle[shuffle_offset++]), output_data);
+				caffe_axpy<Dtype>(spatial_dims, Dtype(1.), 
+					bottom_data + bottom[0]->offset(n, round(shuffle[j])), output_data);
 			}
 		}
 	}
@@ -71,18 +98,20 @@ void SelectingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 	{
 		int spatial_dims = width * height;
 		Dtype* bottom_diff = (*bottom)[0]->mutable_cpu_diff();
-		const Dtype* top_diff = top[0]->cpu_diff();
+		
+		caffe_set((*bottom)[0]->count(), Dtype(0), bottom_diff);
 		
 		for(int n = 0; n < num; n++)
 		{
-			for(int i = 0, shuffle_offset = 0; i < num_output; i++)
+			for(int i = 0; i < num_output; i++)
 			{
+				const Dtype *shuffle = this->blobs_[0]->cpu_data() + this->blobs_[0]->offset(0, i);
+				const Dtype* top_diff = top[0]->cpu_diff() + top[0]->offset(n, i);
 				for(int j = 0; j < group_size; j++)
 				{
-					caffe_copy(spatial_dims, top_diff, 
-						bottom_diff + (*bottom)[0]->offset(n, shuffle[shuffle_offset++]));
+					caffe_axpy<Dtype>(spatial_dims, Dtype(1.), top_diff, 
+						bottom_diff + (*bottom)[0]->offset(n, round(shuffle[j])));
 				}
-				top_diff += top[0]->offset(0, 1);
 			}
 		}
 	}

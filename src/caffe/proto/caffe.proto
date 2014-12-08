@@ -793,4 +793,5 @@ message UpsamplingParameter{
 message SelectingParameter{
 	optional uint32 num_output = 1 [default = 1];	// number of output channels for this layer
 	optional uint32 group_size = 2 [default = 1];	// number of channels in each group
+	optional bool distinct = 3 [default = true];	// each element is distinct
 }

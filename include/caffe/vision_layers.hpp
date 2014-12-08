@@ -408,10 +408,9 @@ protected:
 	
 	// parameters
 	int num_output, group_size;
+	bool distinct;
 	// bottom's
 	int count, num, channels, width, height;
-	
-	vector<int> shuffle;
 };
 
 }  // namespace caffe
