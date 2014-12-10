@@ -44,12 +44,12 @@ void SoftmaxWithLossLayer<Dtype>::Forward_cpu(
   for (int i = 0; i < num; ++i) {
     for (int j = 0; j < spatial_dim; j++) {
       // regard label < 0 as unknown
-      if(static_cast<int>(label[i * spatial_dim + j]) >= 0)
+      if(static_cast<int>(label[i * spatial_dim + j]) != 255)
       {
       	loss -= log(std::max(prob_data[i * dim +
           static_cast<int>(label[i * spatial_dim + j]) * spatial_dim + j],
                            Dtype(FLT_MIN)));
-	  }
+	}
     }
   }
   (*top)[0]->mutable_cpu_data()[0] = loss / num / spatial_dim;
@@ -76,7 +76,7 @@ void SoftmaxWithLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     int spatial_dim = prob_.height() * prob_.width();
     for (int i = 0; i < num; ++i) {
       for (int j = 0; j < spatial_dim; ++j) {
-      	if(static_cast<int>(label[i * spatial_dim + j]) >= 0)
+      	if(static_cast<int>(label[i * spatial_dim + j]) != 255)
       	{
           bottom_diff[i * dim + static_cast<int>(label[i * spatial_dim + j])
            	* spatial_dim + j] -= 1;
