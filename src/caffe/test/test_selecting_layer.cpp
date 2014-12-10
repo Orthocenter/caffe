@@ -146,7 +146,7 @@ TYPED_TEST(SelectingLayerTest, TestForward)
 						shuffle[g] * spatial_dims + j];
 				}
 				
-				sequence_gt.push_back(value);
+				sequence_gt.push_back(value / group_size);
 			}
 		}
 	}
@@ -154,7 +154,7 @@ TYPED_TEST(SelectingLayerTest, TestForward)
 	EXPECT_EQ(sequence.size(), sequence_gt.size());
 	for(int i = 0; i < sequence.size(); i++)
 	{
-		EXPECT_EQ(sequence[i], sequence_gt[i]);
+		EXPECT_NEAR(sequence[i], sequence_gt[i], 1e-5);
 	}
 }
 
@@ -206,14 +206,14 @@ TYPED_TEST(SelectingLayerTest, TestForwardDistinct)
 			{
 				value += this->blob_bottom->cpu_data()[i * bottom_dims + shuffle[g] * spatial_dims + j];
 			}
-			sequence_gt.push_back(value);
+			sequence_gt.push_back(value / group_size);
 		}
 	}
 	
 	EXPECT_EQ(sequence.size(), sequence_gt.size());
 	for(int i = 0; i < sequence.size(); i++)
 	{
-		EXPECT_EQ(sequence[i], sequence_gt[i]);
+		EXPECT_NEAR(sequence[i], sequence_gt[i], 1e-5);
 	}
 }
 

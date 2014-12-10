@@ -75,15 +75,14 @@ void SelectingLayer<Dtype>::Forward_cpu(
 		{
 			const Dtype *shuffle = this->blobs_[0]->cpu_data() + this->blobs_[0]->offset(0, i);
 			
-			// copy the first channel in i_th group into output channel
+			// set output_data to 0
 			Dtype *output_data = top_data + (*top)[0]->offset(n, i);
-			caffe_copy(spatial_dims, 
-				bottom_data + bottom[0]->offset(n, round(shuffle[0])), output_data);
+			caffe_set(spatial_dims,  Dtype(0), output_data);
 
-			// add other channels in i_th group into output channel
-			for(int j = 1; j < group_size; j++)
+			// add all channels in i_th group into output channel with scale (1 / group_size)
+			for(int j = 0; j < group_size; j++)
 			{
-				caffe_axpy<Dtype>(spatial_dims, Dtype(1.), 
+				caffe_axpy<Dtype>(spatial_dims, Dtype(1. / group_size), 
 					bottom_data + bottom[0]->offset(n, round(shuffle[j])), output_data);
 			}
 		}
@@ -109,7 +108,7 @@ void SelectingLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
 				const Dtype* top_diff = top[0]->cpu_diff() + top[0]->offset(n, i);
 				for(int j = 0; j < group_size; j++)
 				{
-					caffe_axpy<Dtype>(spatial_dims, Dtype(1.), top_diff, 
+					caffe_axpy<Dtype>(spatial_dims, Dtype(1. / group_size), top_diff, 
 						bottom_diff + (*bottom)[0]->offset(n, round(shuffle[j])));
 				}
 			}
